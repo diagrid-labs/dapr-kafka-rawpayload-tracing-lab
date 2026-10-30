@@ -1,0 +1,19 @@
+version: 1
+common:
+  resourcesPath: ./resources
+  configFilePath: ./config.yaml
+apps:
+  # Plain Java (JDK only), no Dapr SDK.
+  - appID: raw-subscriber
+    appDirPath: .
+    appPort: 8180
+    command: ["java", "RawXmlSubscriber.java"]
+    env:
+      APP_PORT: "8180"
+  # Spring Boot with the Dapr Java SDK (@Topic).
+  - appID: spring-sdk-subscriber
+    appDirPath: ./spring-sdk-subscriber
+    appPort: 8181
+    command: ["java", "-jar", "target/spring-sdk-subscriber-1.0.0.jar"]
+    env:
+      SERVER_PORT: "8181"

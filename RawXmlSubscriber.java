@@ -21,7 +21,8 @@ public class RawXmlSubscriber {
     static final Pattern TXN_ID = Pattern.compile("<TxnId>([^<]+)</TxnId>");
 
     public static void main(String[] args) throws IOException {
-        HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
+        int port = Integer.parseInt(System.getenv().getOrDefault("APP_PORT", "8080"));
+        HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
 
         // Programmatic subscription. rawPayload=true: the producer did not use Dapr,
         // so the record value is plain XML, not a CloudEvent.
@@ -48,7 +49,7 @@ public class RawXmlSubscriber {
             Matcher txn = TXN_ID.matcher(xml);
             String transactionId = txn.find() ? txn.group(1) : "<unknown>";
 
-            // In a Spring/Logback app put these in the MDC instead, e.g.
+            // In a Spring/Logback app you could put these in the MDC, e.g.
             // MDC.put("traceId", traceId); MDC.put("transactionId", transactionId);
             System.out.printf("traceId=%s transactionId=%s traceparent=%s xml=%s%n",
                     traceId, transactionId, traceparent, xml);
@@ -57,7 +58,7 @@ public class RawXmlSubscriber {
         });
 
         server.start();
-        System.out.println("RawXmlSubscriber listening on :8080");
+        System.out.println("RawXmlSubscriber listening on :" + port);
     }
 
     static void respond(HttpExchange ex, String json) throws IOException {

@@ -1,6 +1,6 @@
 # Trace context for raw Kafka messages in Dapr
 
-A Java app subscribes to a Kafka topic with `rawPayload: "true"`. The producer doesn't use Dapr, so the messages carry no trace context. This lab shows what `traceparent` the app receives on Dapr 1.19.0.
+A Java app subscribes to a Kafka topic with `rawPayload: "true"`. The producer doesn't use Dapr, so the XML messages carry no trace context. On Dapr 1.19.0, the app still gets a `traceparent` for every message, and the payload stays untouched.
 
 ## Run
 
@@ -13,50 +13,36 @@ kubectl -n kafka-tracing-lab create configmap subscriber-src --from-file=RawXmlS
 kubectl -n kafka-tracing-lab rollout status deploy/kafka-broker
 kubectl -n kafka-tracing-lab exec deploy/kafka-broker -- /opt/kafka/bin/kafka-topics.sh \
   --bootstrap-server localhost:9092 --create --if-not-exists --topic payments-incoming
-kubectl apply -f k8s/apps.yaml -f k8s/sampling-variants.yaml
-kubectl -n kafka-tracing-lab wait --for=condition=available deploy --all --timeout=180s
+kubectl apply -f k8s/apps.yaml
+kubectl -n kafka-tracing-lab rollout status deploy/subscriber
 ```
 
-Publish one message without headers and one with a `traceparent` Kafka header:
+Publish one message without headers, and one with a `traceparent` Kafka header:
 
 ```bash
-echo '<PaymentRequest><TxnId>TXN-A-001</TxnId></PaymentRequest>' | \
+echo '<PaymentRequest><TxnId>TXN-A-001</TxnId><Amount>1500.00</Amount></PaymentRequest>' | \
   kubectl -n kafka-tracing-lab exec -i deploy/kafka-broker -- /opt/kafka/bin/kafka-console-producer.sh \
   --bootstrap-server localhost:9092 --topic payments-incoming
 
-printf 'traceparent:00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01\t<PaymentRequest><TxnId>TXN-B-002</TxnId></PaymentRequest>\n' | \
+printf 'traceparent:00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01\t<PaymentRequest><TxnId>TXN-B-002</TxnId><Amount>2750.00</Amount></PaymentRequest>\n' | \
   kubectl -n kafka-tracing-lab exec -i deploy/kafka-broker -- /opt/kafka/bin/kafka-console-producer.sh \
   --bootstrap-server localhost:9092 --topic payments-incoming --property parse.headers=true
 ```
 
-See what each subscriber got:
-
 ```bash
-for d in sub-rate-1 sub-rate-low sub-no-config sub-rate-0; do
-  echo "== $d"; kubectl -n kafka-tracing-lab logs deploy/$d -c app | grep traceId
-done
+kubectl -n kafka-tracing-lab logs deploy/subscriber -c app | grep traceId
 ```
 
-## Results
+## Result
 
-**Message without headers:** what the app receives depends on the tracing config.
-
-| Subscriber | Tracing config | `traceparent` received |
-|---|---|---|
-| `sub-rate-1` | `samplingRate: "1"` | new trace ID, span exported |
-| `sub-rate-low` | `samplingRate: "0.0001"` | new trace ID, not sampled |
-| `sub-no-config` | none | all zeros |
-| `sub-rate-0` | `samplingRate: "0"` | none |
-
-**Message with a `traceparent` header:** every subscriber gets the producer's trace ID (`4bf92f…`).
-
-**Payload:** in all cases the XML arrives unchanged. It's base64-encoded in the `data_base64` field of the request body.
-
-If an app gets no `traceparent` at all, check the daprd log for the version and the sampling rate:
-
-```bash
-kubectl -n kafka-tracing-lab logs deploy/sub-rate-0 -c daprd | grep -E 'Starting Dapr Runtime|trace sampler'
 ```
+traceId=927a61b1754604ff32f8037a9595dae9 transactionId=TXN-A-001 traceparent=00-927a61b1754604ff32f8037a9595dae9-d7871092198769b5-01 xml=<PaymentRequest><TxnId>TXN-A-001</TxnId><Amount>1500.00</Amount></PaymentRequest>
+traceId=4bf92f3577b34da6a3ce929d0e0e4736 transactionId=TXN-B-002 traceparent=00-4bf92f3577b34da6a3ce929d0e0e4736-90af940adb4f64c0-01 xml=<PaymentRequest><TxnId>TXN-B-002</TxnId><Amount>2750.00</Amount></PaymentRequest>
+```
+
+- **No headers:** Dapr starts a new trace, and the app logs its trace ID next to the transaction ID.
+- **`traceparent` header:** Dapr continues the producer's trace (`4bf92f…`).
+- **Payload:** the XML arrives exactly as published.
 
 ## Clean up
 

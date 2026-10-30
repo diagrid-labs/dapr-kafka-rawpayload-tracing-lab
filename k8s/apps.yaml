@@ -1,19 +1,19 @@
-# The subscriber on daprd 1.19.0 with the tracing Configuration from dapr.yaml.
+# The Java subscriber with the tracing Configuration from dapr.yaml.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: sub-rate-1
+  name: subscriber
   namespace: kafka-tracing-lab
 spec:
   replicas: 1
   selector:
-    matchLabels: {app: sub-rate-1}
+    matchLabels: {app: subscriber}
   template:
     metadata:
-      labels: {app: sub-rate-1}
+      labels: {app: subscriber}
       annotations:
         dapr.io/enabled: "true"
-        dapr.io/app-id: "sub-rate-1"
+        dapr.io/app-id: "subscriber"
         dapr.io/app-port: "8080"
         dapr.io/config: "tracing"
     spec:

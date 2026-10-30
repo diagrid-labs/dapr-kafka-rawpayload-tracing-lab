@@ -1,0 +1,28 @@
+apiVersion: dapr.io/v1alpha1
+kind: Configuration
+metadata:
+  name: tracing
+  namespace: kafka-tracing-lab
+spec:
+  tracing:
+    samplingRate: "1"
+    zipkin:
+      endpointAddress: "http://zipkin.kafka-tracing-lab.svc.cluster.local:9411/api/v2/spans"
+---
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: kafka-pubsub
+  namespace: kafka-tracing-lab
+spec:
+  type: pubsub.kafka
+  version: v1
+  metadata:
+  - name: brokers
+    value: "kafka-broker.kafka-tracing-lab.svc.cluster.local:9092"
+  - name: consumerGroup
+    value: "{appID}"
+  - name: authType
+    value: "none"
+  - name: initialOffset
+    value: "oldest"

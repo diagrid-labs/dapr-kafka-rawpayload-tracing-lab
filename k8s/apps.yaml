@@ -1,0 +1,63 @@
+# The same Java subscriber twice, each in its own consumer group:
+#   subscriber-119 -> daprd 1.19.0 (control plane default)
+#   subscriber-118 -> daprd 1.18.4 (before the root-span fix)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: subscriber-119
+  namespace: kafka-tracing-lab
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: subscriber-119}
+  template:
+    metadata:
+      labels: {app: subscriber-119}
+      annotations:
+        dapr.io/enabled: "true"
+        dapr.io/app-id: "subscriber-119"
+        dapr.io/app-port: "8080"
+        dapr.io/config: "tracing"
+    spec:
+      containers:
+      - name: app
+        image: eclipse-temurin:21-jdk
+        command: ["java", "/app/RawXmlSubscriber.java"]
+        ports:
+        - containerPort: 8080
+        volumeMounts:
+        - {name: src, mountPath: /app}
+      volumes:
+      - name: src
+        configMap: {name: subscriber-src}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: subscriber-118
+  namespace: kafka-tracing-lab
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: subscriber-118}
+  template:
+    metadata:
+      labels: {app: subscriber-118}
+      annotations:
+        dapr.io/enabled: "true"
+        dapr.io/app-id: "subscriber-118"
+        dapr.io/app-port: "8080"
+        dapr.io/config: "tracing"
+        dapr.io/sidecar-image: "ghcr.io/dapr/daprd:1.18.4"
+    spec:
+      containers:
+      - name: app
+        image: eclipse-temurin:21-jdk
+        command: ["java", "/app/RawXmlSubscriber.java"]
+        ports:
+        - containerPort: 8080
+        volumeMounts:
+        - {name: src, mountPath: /app}
+      volumes:
+      - name: src
+        configMap: {name: subscriber-src}
